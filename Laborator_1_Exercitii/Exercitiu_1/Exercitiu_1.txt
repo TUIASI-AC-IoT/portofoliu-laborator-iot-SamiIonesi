@@ -1,0 +1,36 @@
+1. Care rol are funcția gpio_config?
+
+Funcția gpio_config(&io_conf); este utilizată pentru a configura pinii GPIO ai ESP32 conform parametrilor specificați într-o structură de tip gpio_config_t. Această funcție inițializează și aplică setările definite în structura io_conf, cum ar fi:
+
+- Direcția pinului (intrare sau ieșire).
+- Activarea/dezactivarea pull-up și pull-down.
+- Tipul de întrerupere (dacă este necesar).
+- Selectarea pinilor care vor fi configurați.
+
+2. În codul exemplu, pinul GPIO4 este configurat ca ieșire. Care sunt celelalte moduri în care poate fi configurat un pin GPIO?
+
+Pe ESP32, un pin GPIO poate fi configurat în mai multe moduri:
+
+- GPIO_MODE_DISABLE – Pinul este dezactivat (nu este nici intrare, nici ieșire).
+- GPIO_MODE_INPUT – Pinul este configurat ca intrare (citire de semnal).
+- GPIO_MODE_OUTPUT – Pinul este configurat ca ieșire (scriere de semnal).
+- GPIO_MODE_OUTPUT_OD (Open Drain Output) – Pinul poate fi setat la LOW sau lăsat "flotant" (folosit pentru comunicație I2C).
+- GPIO_MODE_INPUT_OUTPUT – Pinul poate funcționa atât ca intrare, cât și ca ieșire (mod bidirecțional).
+- GPIO_MODE_INPUT_OUTPUT_OD – Mod combinat de intrare/ieșire open-drain.
+
+3. Explicați apelul vTaskDelay.
+
+Apelul vTaskDelay(1000 / portTICK_PERIOD_MS); este utilizat pentru a introduce o întârziere (delay) într-un task FreeRTOS.
+
+1000 / portTICK_PERIOD_MS convertește 1000 de milisecunde (1 secundă) în tick-uri ale sistemului de operare (RTOS).
+vTaskDelay suspendă execuția task-ului curent pentru numărul specificat de tick-uri, permițând altor task-uri să ruleze.
+Această metodă este mai eficientă decât un delay activ (cum ar fi un for loop), deoarece permite procesorului să execute și alte sarcini în timpul pauzei.
+
+4. De ce funcția principală se numește app_main?
+
+În ESP-IDF (framework-ul oficial de dezvoltare pentru ESP32), punctul de intrare al programului nu este main(), ca în C standard, ci app_main().
+
+Aceasta este impusă de structura FreeRTOS, care rulează un kernel real-time.
+app_main este recunoscută de sistem ca punct de start al aplicației utilizatorului.
+La pornire, ESP-IDF inițializează FreeRTOS și alte componente de sistem înainte de a apela app_main.
+Astfel, app_main este punctul de start pentru dezvoltatorii care scriu aplicații pe ESP32 utilizând ESP-IDF.
