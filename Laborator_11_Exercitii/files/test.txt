@@ -1,0 +1,1 @@
+Acesta este un text suprascris din fisierul test.txt

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>File Manager</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    input, textarea, button { margin: 5px 0; display: block; width: 300px; }
+    #fileList { margin-top: 20px; }
+    pre { background: #f4f4f4; padding: 10px; }
+  </style>
+</head>
+<body>
+
+  <h1>File Manager REST</h1>
+
+  <h2>1. List Files</h2>
+  <button onclick="listFiles()">List Files</button>
+  <ul id="fileList"></ul>
+
+  <h2>2. Read File</h2>
+  <input type="text" id="readFileName" placeholder="Filename (e.g., test.txt)">
+  <button onclick="readFile()">Read File</button>
+  <pre id="fileContent"></pre>
+
+  <h2>3. Create File with Name</h2>
+  <input type="text" id="createFileName" placeholder="Filename (e.g., newfile.txt)">
+  <textarea id="createFileContent" placeholder="File content"></textarea>
+  <button onclick="createFileWithName()">Create</button>
+
+  <h2>4. Create File with Auto Name</h2>
+  <textarea id="createAutoContent" placeholder="File content"></textarea>
+  <button onclick="createFileAuto()">Create</button>
+
+
+  <h2>5. Delete File</h2>
+  <input type="text" id="deleteFileName" placeholder="Filename">
+  <button onclick="deleteFile()">Delete</button>
+
+  <h2>6. Update File</h2>
+  <input type="text" id="updateFileName" placeholder="Filename">
+  <textarea id="updateFileContent" placeholder="New content"></textarea>
+  <button onclick="updateFile()">Update</button>
+
+
+  <script>
+    const API = 'http://localhost:5000';
+
+    function listFiles() {
+      fetch(`${API}/files`)
+        .then(res => res.json())
+        .then(files => {
+          const list = document.getElementById('fileList');
+          list.innerHTML = '';
+          files.forEach(file => {
+            const li = document.createElement('li');
+            li.textContent = file;
+            list.appendChild(li);
+          });
+        });
+    }
+
+    function readFile() {
+      const filename = document.getElementById('readFileName').value;
+      fetch(`${API}/files/${filename}`)
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById('fileContent').textContent = data.content || JSON.stringify(data);
+        });
+    }
+
+    function createFileWithName() {
+      const filename = document.getElementById('createFileName').value;
+      const content = document.getElementById('createFileContent').value;
+
+      fetch(`${API}/files`, {        // POST pe /files, fără filename în URL
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename, content })   // filename + content în body
+      })
+      .then(res => res.json())
+      .then(alertResponse);
+    }
+
+
+    function createFileAuto() {
+      const content = document.getElementById('createAutoContent').value;
+      fetch(`${API}/files/auto`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content })
+      }).then(res => res.json()).then(alertResponse);
+    }
+
+    function updateFile() {
+      const filename = document.getElementById('updateFileName').value;
+      const content = document.getElementById('updateFileContent').value;
+      fetch(`${API}/files/${filename}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content })
+      }).then(res => res.json()).then(alertResponse);
+    }
+
+    function deleteFile() {
+      const filename = document.getElementById('deleteFileName').value;
+      fetch(`${API}/files/${filename}`, {
+        method: 'DELETE'
+      }).then(res => res.json()).then(alertResponse);
+    }
+
+    function alertResponse(data) {
+      alert(JSON.stringify(data));
+    }
+  </script>
+
+</body>
+</html>
