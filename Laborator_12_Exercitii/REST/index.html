@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8" />
+    <title>Aplicație Senzori</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; max-width: 600px; }
+        input, button { padding: 8px; margin: 5px 0; width: 100%; }
+        button { cursor: pointer; }
+        pre { background: #eee; padding: 10px; white-space: pre-wrap; }
+        .error { color: red; }
+        .success { color: green; }
+        ul { padding-left: 20px; }
+        li { margin: 4px 0; }
+        li:hover { text-decoration: underline; color: blue; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Gestionare senzori</h1>
+
+
+    <h2>Listează senzori existenți</h2>
+    <button onclick="listSensors()">Arată toți senzorii</button>
+    <ul id="sensorList"></ul>
+    <div id="sensorValue"></div>
+
+    <h2>Citește valoare senzor</h2>
+    <input type="text" id="readSensorId" placeholder="ID senzor (ex: senzor1)" />
+    <button onclick="readSensorValue()">Obține valoare</button>
+    <div id="readResult"></div>
+
+    <h2>Adaugă senzor nou</h2>
+    <input type="text" id="sensorId" placeholder="ID senzor (ex: senzor1)" />
+    <input type="text" id="sensorType" placeholder="Tip senzor (ex: temperature)" />
+    <button onclick="addSensor()">Adaugă senzor</button>
+    <div id="addResult"></div>
+
+    <h2>Actualizează senzor existent</h2>
+    <input type="text" id="updateSensorId" placeholder="ID senzor (ex: senzor1)" />
+    <input type="text" id="updateSensorType" placeholder="Noul tip senzor (ex: light)" />
+    <button onclick="updateSensor()">Actualizează senzor</button>
+    <div id="updateResult"></div>
+
+    <script>
+        function addSensor() {
+            const id = document.getElementById('sensorId').value.trim();
+            const type = document.getElementById('sensorType').value.trim();
+            const resDiv = document.getElementById('addResult');
+            resDiv.textContent = '';
+
+            if (!id || !type) {
+                resDiv.innerHTML = '<p class="error">Completează ID și tipul senzorului!</p>';
+                return;
+            }
+
+            fetch(`/sensors/${encodeURIComponent(id)}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({type})
+            })
+            .then(response => response.json().then(data => ({status: response.status, body: data})))
+            .then(({status, body}) => {
+                if (status === 201) {
+                    resDiv.innerHTML = `<p class="success">Senzor creat: ID=${body.sensor.id}, Tip=${body.sensor.type}</p>`;
+                } else {
+                    resDiv.innerHTML = `<p class="error">Eroare: ${body.error || JSON.stringify(body)}</p>`;
+                }
+            })
+            .catch(err => {
+                resDiv.innerHTML = `<p class="error">Eroare la rețea: ${err}</p>`;
+            });
+        }
+
+        function readSensorValue() {
+            const id = document.getElementById('readSensorId').value.trim();
+            const resDiv = document.getElementById('readResult');
+            resDiv.textContent = '';
+
+            if (!id) {
+                resDiv.innerHTML = '<p class="error">Completează ID senzor!</p>';
+                return;
+            }
+
+            fetch(`/sensors/${encodeURIComponent(id)}/value`)
+            .then(response => response.json().then(data => ({status: response.status, body: data})))
+            .then(({status, body}) => {
+                if (status === 200) {
+                    resDiv.innerHTML = `<pre>ID: ${body.sensor_id}\nTip: ${body.type}\nValoare: ${body.value}</pre>`;
+                } else {
+                    resDiv.innerHTML = `<p class="error">Eroare: ${body.error || JSON.stringify(body)}</p>`;
+                }
+            })
+            .catch(err => {
+                resDiv.innerHTML = `<p class="error">Eroare la rețea: ${err}</p>`;
+            });
+        }
+
+        function updateSensor() {
+            const id = document.getElementById('updateSensorId').value.trim();
+            const type = document.getElementById('updateSensorType').value.trim();
+            const resDiv = document.getElementById('updateResult');
+            resDiv.textContent = '';
+
+            if (!id || !type) {
+                resDiv.innerHTML = '<p class="error">Completează ID și noul tip senzorului!</p>';
+                return;
+            }
+
+            fetch(`/sensors/${encodeURIComponent(id)}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({type})
+            })
+            .then(response => response.json().then(data => ({status: response.status, body: data})))
+            .then(({status, body}) => {
+                if (status === 200) {
+                    resDiv.innerHTML = `<p class="success">Senzor actualizat: ID=${body.sensor.id}, Tip nou=${body.sensor.type}</p>`;
+                } else {
+                    resDiv.innerHTML = `<p class="error">Eroare: ${body.error || JSON.stringify(body)}</p>`;
+                }
+            })
+            .catch(err => {
+                resDiv.innerHTML = `<p class="error">Eroare la rețea: ${err}</p>`;
+            });
+        }
+
+        function listSensors() {
+            const listElem = document.getElementById('sensorList');
+            const valElem = document.getElementById('sensorValue');
+            listElem.innerHTML = '';
+            valElem.innerHTML = '';
+
+            fetch('/sensors')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.sensors && data.sensors.length > 0) {
+                        data.sensors.forEach(sensorId => {
+                            const li = document.createElement('li');
+                            li.textContent = sensorId;
+                            li.onclick = () => readSensorValueFromList(sensorId);
+                            listElem.appendChild(li);
+                        });
+                    } else {
+                        listElem.textContent = 'Nu există senzori în sistem.';
+                    }
+                })
+                .catch(err => {
+                    listElem.textContent = 'Eroare la preluarea senzorilor: ' + err.message;
+                });
+        }
+
+        function readSensorValueFromList(sensorId) {
+            const valElem = document.getElementById('sensorValue');
+            valElem.innerHTML = `<p>Se încarcă valoarea pentru senzorul <b>${sensorId}</b>...</p>`;
+
+            fetch(`/sensors/${encodeURIComponent(sensorId)}/value`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.value !== undefined) {
+                        valElem.innerHTML = `<pre>ID: ${data.sensor_id}\nTip: ${data.type}\nValoare: ${data.value}</pre>`;
+                    } else {
+                        valElem.innerHTML = `<p class="error">Eroare: ${data.error || 'Datele nu sunt disponibile'}</p>`;
+                    }
+                })
+                .catch(err => {
+                    valElem.innerHTML = `<p class="error">Eroare la rețea: ${err.message}</p>`;
+                });
+        }
+    </script>
+</body>
+</html>
