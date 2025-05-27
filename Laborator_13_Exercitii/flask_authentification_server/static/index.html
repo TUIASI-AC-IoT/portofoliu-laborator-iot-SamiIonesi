@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Autentificare ESP32 + PIR Live</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 400px;
+      margin: auto;
+      padding-top: 50px;
+    }
+
+    input, button {
+      width: 100%;
+      margin-bottom: 10px;
+      padding: 10px;
+    }
+
+    #response, #error, #verifyResult, #logoutResult, #pirResponse {
+      margin-top: 15px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    #response { color: green; }
+    #error { color: red; }
+    #verifyResult { color: blue; }
+    #logoutResult { color: darkred; }
+    #pirResponse { color: darkgreen; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h2>Autentificare</h2>
+  <input type="text" id="username" placeholder="Username" />
+  <input type="password" id="password" placeholder="Password" />
+  <button onclick="login()">Login</button>
+
+  <div id="response"></div>
+  <div id="error"></div>
+
+  <button onclick="copyToken()">Copiază tokenul JWT</button>
+
+  <h2>Verificare Token</h2>
+  <input type="text" id="jwtToken" placeholder="Lipește tokenul JWT aici" />
+  <button onclick="validateToken()">Verifică Token</button>
+  <div id="verifyResult"></div>
+
+  <h2>Logout</h2>
+  <input type="text" id="logoutToken" placeholder="Token pentru logout" size="80" />
+  <button onclick="logout()">Logout</button>
+  <div id="logoutResult"></div>
+
+  <h2>PIR Activat</h2>
+  <input type="checkbox" id="pirValue" />
+  <button onclick="sendPirData()">Trimite PIR</button>
+  <div id="pirResponse"></div>
+
+  <script>
+    let currentToken = "";
+    let pollingInterval;
+
+    function login() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+
+      fetch('/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      })
+      .then(res => res.json().then(data => ({ status: res.status, body: data })))
+      .then(res => {
+        if (res.status === 200) {
+          currentToken = res.body.access_token;
+          document.getElementById('response').textContent =
+            "Token generat cu succes:\n" + currentToken;
+          startPolling();
+        } else {
+          document.getElementById('response').textContent = "Eroare: " + res.body.msg;
+          currentToken = "";
+          stopPolling();
+        }
+      })
+      .catch(() => {
+        document.getElementById('response').textContent = "Eroare la autentificare.";
+        currentToken = "";
+        stopPolling();
+      });
+    }
+
+    function copyToken() {
+      if (!currentToken) {
+        alert("Nu există token de copiat. Asigură-te că te-ai autentificat cu succes.");
+        return;
+      }
+
+      const textarea = document.createElement("textarea");
+      textarea.value = currentToken;
+      document.body.appendChild(textarea);
+      textarea.select();
+
+      try {
+        const successful = document.execCommand('copy');
+        alert(successful ? "Tokenul a fost copiat cu succes în clipboard!" : "Nu s-a putut copia tokenul.");
+      } catch {
+        alert("Eroare la copierea tokenului.");
+      }
+
+      document.body.removeChild(textarea);
+    }
+
+    function validateToken() {
+      const token = document.getElementById('jwtToken').value;
+
+      fetch('/auth/jwtStore', {
+        method: 'GET',
+        headers: { 'Authorization': 'Bearer ' + token }
+      })
+      .then(res => res.json().then(data => ({ status: res.status, body: data })))
+      .then(res => {
+        if (res.status === 200) {
+          document.getElementById('verifyResult').innerHTML  =
+            `✅ Token valid<br>Utilizator: ${res.body.username}<br>Rol: ${res.body.role}`;
+        } else {
+          document.getElementById('verifyResult').innerHTML  =
+            `❌ Token invalid sau expirat<br>${res.body.msg || ""}`;
+        }
+      })
+      .catch(() => {
+        document.getElementById('verifyResult').textContent = "Eroare la validare.";
+      });
+    }
+
+    function logout() {
+      const token = document.getElementById('logoutToken').value;
+
+      fetch('/auth/jwtStore', {
+        method: 'DELETE',
+        headers: { 'Authorization': 'Bearer ' + token }
+      })
+      .then(res => res.json().then(data => ({ status: res.status, body: data })))
+      .then(res => {
+        if (res.status === 200) {
+          document.getElementById('logoutResult').textContent = "✅ " + res.body.msg;
+          if (token === currentToken) {
+            currentToken = "";
+            stopPolling();
+            document.getElementById('pirResponse').textContent = "";
+          }
+        } else {
+          document.getElementById('logoutResult').textContent = "❌ " + res.body.msg;
+        }
+      })
+      .catch(() => {
+        document.getElementById('logoutResult').textContent = "Eroare la logout.";
+      });
+    }
+
+    function sendPirData() {
+      if (!currentToken) {
+        alert("Te rugăm să te autentifici mai întâi pentru a obține token.");
+        return;
+      }
+
+      const pirValue = document.getElementById('pirValue').checked ? 1 : 0;
+
+      fetch('/sensor/pir1', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + currentToken
+        },
+        body: JSON.stringify({ pir: pirValue })
+      })
+      .then(res => res.json().then(data => ({ status: res.status, body: data })))
+      .then(res => {
+        if (res.status === 200) {
+          document.getElementById('pirResponse').textContent = "✅ Server a primit datele: " + JSON.stringify(res.body);
+        } else {
+          document.getElementById('pirResponse').textContent = "❌ Eroare: " + (res.body.msg || "Necunoscută");
+        }
+      })
+      .catch(() => {
+        document.getElementById('pirResponse').textContent = "Eroare la trimiterea datelor.";
+      });
+    }
+
+    function startPolling() {
+      if (!currentToken) {
+        alert("Te rugăm să te autentifici mai întâi.");
+        return;
+      }
+
+      if (pollingInterval) clearInterval(pollingInterval);
+
+      pollingInterval = setInterval(() => {
+        fetch('/sensor/pir1', {
+          method: 'GET',
+          headers: { 'Authorization': 'Bearer ' + currentToken }
+        })
+        .then(res => res.json().then(data => ({ status: res.status, body: data })))
+        .then(res => {
+          if (res.status === 200) {
+            document.getElementById('pirResponse').textContent = "Stare PIR: " + (res.body.pir ? "Activat" : "Dezactivat");
+          } else {
+            document.getElementById('pirResponse').textContent = "❌ " + (res.body.msg || "Eroare la citire");
+          }
+        })
+        .catch(() => {
+          document.getElementById('pirResponse').textContent = "Eroare la citire.";
+        });
+      }, 2000);
+    }
+
+    function stopPolling() {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+        pollingInterval = null;
+      }
+    }
+  </script>
+</body>
+</html>
